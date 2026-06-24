@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #F7F4E9;
+  --foreground: #1E2B1C;
+  --card: #FFFFFF;
+  --border: #D9D0AE;
+  --muted: #ECE5CB;
+  --muted-foreground: #5C6B53;
+
+  --primary: #2F6B3C;
+  --primary-foreground: #F7F4E9;
+
+  --secondary: #ECE5CB;
+
+  --accent: #CFE000;
+  --accent-foreground: #5C6300;
+
+  --court-teal: #2C5F8A;
+  --court-teal-tint: #DCE7F0;
+  --court-teal-foreground: #1B3C57;
+
+  --destructive: #9C3B2E;
+  --destructive-foreground: #F7F4E9;
+
+  --radius: 1rem;
+
+  --font-display: "Space Grotesk", sans-serif;
+  --font-sans: "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* mobile-first app shell: phone-width column centered on a wider page */
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  background: var(--background);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
