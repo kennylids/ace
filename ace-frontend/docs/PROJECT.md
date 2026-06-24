@@ -2,28 +2,41 @@
 
 ## Overview
 
-Ace is a mobile-first web app for tennis clubs to publish events (clinics, mixers, ladder matches) and for members to browse and join them. Two user roles — **participant** and **admin** — each with a distinct experience. Currently runs entirely client-side with in-memory state; no backend API.
+Ace is a mobile-first web app for tennis clubs to publish events (clinics, mixers, ladder matches) and for members to browse and join them. Two user roles — **participant** and **admin** — each with a distinct experience.
+
+## Architecture
+
+```
+ace-frontend (Next.js 14, App Router)  →  ace-backend (Express + TypeScript)
+                                              ├── PostgreSQL (Docker)
+                                              ├── JWT auth (bcrypt + httpOnly cookies)
+                                              └── Raw SQL via node-postgres (pg)
+```
 
 ## Tech Stack
 
 | Layer | Choice |
 |-------|--------|
-| Framework | Next.js 14 (App Router) |
+| Frontend Framework | Next.js 14 (App Router) |
+| Backend Framework | Express.js |
 | Language | TypeScript (strict) |
+| Database | PostgreSQL 16 (Docker) |
+| DB Client | node-postgres (pg) — raw SQL |
+| Auth | Custom JWT (access + refresh tokens) |
+| Validation | Zod |
 | UI primitives | Radix UI (Dialog, Sheet, Select, Avatar, Progress, Label, Separator) |
 | Styling | Tailwind CSS + tailwindcss-animate |
 | Component variants | class-variance-authority (CVA) |
 | Icons | Lucide React |
-| Utility | clsx, tailwind-merge |
 
 ## Features
 
 ### Authentication
 
-- Email + password login form (demo — no real auth backend)
-- Role selector toggle: participant or admin
+- Email + password login with JWT tokens
+- Access token (15min) in response body, refresh token (7d) in httpOnly cookie
+- Role-based access: participant or admin
 - Role determines post-login redirect and available views
-- Logout (admin dashboard header)
 
 ### Participant Experience
 
@@ -50,54 +63,89 @@ Ace is a mobile-first web app for tennis clubs to publish events (clinics, mixer
 
 Clinic · Doubles · Singles ladder · Social · Junior
 
-## Data Layer
+## API Endpoints
 
-State is managed via two React Contexts:
+### Auth
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/api/auth/register` | No |
+| POST | `/api/auth/login` | No |
+| POST | `/api/auth/refresh` | Refresh token |
+| GET | `/api/auth/me` | Yes |
 
-- **AuthContext** — current user (name, email, role), login/logout actions.
-- **EventsContext** — full event list, joined-event IDs, CRUD operations (create, update, delete), join/unjoin actions, spots-left calculation.
+### Events
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/api/events` | Yes |
+| GET | `/api/events/:id` | Yes |
+| POST | `/api/events` | Admin |
+| PUT | `/api/events/:id` | Admin |
+| DELETE | `/api/events/:id` | Admin |
+| POST | `/api/events/:id/join` | Yes |
+| DELETE | `/api/events/:id/join` | Yes |
 
-Data is seeded from `data/sample-events.ts` on mount. No persistence between sessions.
+### Users
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/api/users` | Admin |
 
-## UI Component Library
+## Data Model
 
-Reusable primitives live in `components/ui/` following the shadcn/ui pattern:
-
-Avatar · Badge · Button · Card · Dialog · Input · Label · Progress · Select · Separator · Sheet · Textarea
-
-App-level components in `components/`:
-
-- **EventCard** — compact event summary card
-- **EventForm** — create/edit form with category select
-- **TopBar** — page header with optional back button and trailing action
-- **BottomNav** — sticky bottom tab bar (participant views)
-- **EmptyState** — icon + message placeholder when lists are empty
+- **Users** — id, name, email, password (bcrypt), role (ADMIN/PARTICIPANT)
+- **Events** — id, title, category, date, time, location, capacity, description, created_by
+- **EventParticipants** — user_id + event_id (unique constraint), joined_at
 
 ## Project Structure
 
 ```
-app/
-  login/          → Login page
-  feed/           → Participant event feed
-  my-events/      → Participant joined events
-  events/[id]/    → Participant event detail
-  admin/          → Admin dashboard
-  admin/events/new/       → Create event
-  admin/events/[id]/      → Admin event detail
-  admin/events/[id]/edit/ → Edit event
-components/
-  ui/             → Radix-based primitives
-  *.tsx           → App-level composed components
-context/          → AuthContext, EventsContext
-data/             → Sample seed data
-lib/              → Types, utilities, date formatting
+ace-frontend/
+  app/
+    login/          → Login page
+    feed/           → Participant event feed
+    my-events/      → Participant joined events
+    events/[id]/    → Participant event detail
+    admin/          → Admin dashboard
+    admin/events/new/       → Create event
+    admin/events/[id]/      → Admin event detail
+    admin/events/[id]/edit/ → Edit event
+  components/
+    ui/             → Radix-based primitives
+    *.tsx           → App-level composed components
+  context/          → AuthContext, EventsContext
+  data/             → Sample seed data
+  lib/              → Types, utilities, date formatting
+
+ace-backend/
+  src/
+    config/         → env vars, pg pool
+    middleware/     → auth guards, error handler
+    routes/         → auth, events, users
+    services/       → business logic (raw SQL)
+    utils/          → JWT, bcrypt helpers
+  migrations/       → SQL migration files
+  scripts/          → migrate.ts, seed.ts
+  docker-compose.yml
 ```
 
 ## Running Locally
 
 ```bash
-npm install
+# Start database
+cd ace-backend
+docker compose up -d
+
+# Run migrations & seed
+npm run db:migrate
+npm run db:seed
+
+# Start backend (port 3001)
+npm run dev
+
+# Start frontend (port 3000)
+cd ../ace-frontend
 npm run dev
 ```
 
-App starts at `http://localhost:3000`. Redirects to `/login` on first load.
+### Default accounts
+- Admin: `admin@ace.club` / `password123`
+- Participant: `maya@example.com` / `password123`
