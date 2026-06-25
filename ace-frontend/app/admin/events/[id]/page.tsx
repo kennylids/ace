@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { CalendarDays, MapPin, Users, Pencil, Trash2 } from "lucide-react";
-import { useEvents } from "@/context/events-context";
+import { useEventQuery, useDeleteEventMutation } from "@/lib/queries/events";
+import { AdminGuard } from "@/components/admin-guard";
 import { TopBar } from "@/components/top-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,14 +21,39 @@ import { formatFullDate, formatTime } from "@/lib/format";
 
 const avatarColors = ["#2F6B3C", "#2C5F8A", "#9C3B2E", "#5C6B53", "#1C431F"];
 
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
 export default function AdminEventDetailPage() {
+  return (
+    <AdminGuard>
+      <AdminEventDetailContent />
+    </AdminGuard>
+  );
+}
+
+function AdminEventDetailContent() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const { getEvent, deleteEvent } = useEvents();
+  const { data: event, isLoading } = useEventQuery(params.id);
+  const deleteMutation = useDeleteEventMutation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const event = getEvent(params.id);
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
   if (!event) {
     return (
       <div className="flex flex-1 flex-col">
@@ -36,12 +62,15 @@ export default function AdminEventDetailPage() {
     );
   }
 
-  const pct = Math.min(100, Math.round((event.joined.length / event.capacity) * 100));
+  const pct = Math.min(100, Math.round((event.participants.length / event.capacity) * 100));
 
   function handleDelete() {
-    deleteEvent(event!.id);
-    setDeleteOpen(false);
-    router.push("/admin");
+    deleteMutation.mutate(event!.id, {
+      onSuccess: () => {
+        setDeleteOpen(false);
+        router.push("/admin");
+      },
+    });
   }
 
   return (
@@ -73,7 +102,7 @@ export default function AdminEventDetailPage() {
             </div>
             <div className="flex-1">
               <p className="text-[14.5px] font-semibold">
-                {event.joined.length} of {event.capacity} spots filled
+                {event.participants.length} of {event.capacity} spots filled
               </p>
               <Progress value={pct} className="mt-2" />
             </div>
@@ -86,16 +115,16 @@ export default function AdminEventDetailPage() {
         <p className="text-[14px] leading-relaxed text-muted-foreground">{event.description}</p>
 
         <div className="mb-3 mt-5 font-mono text-[11px] uppercase tracking-wide text-muted-foreground/80">
-          Attendees ({event.joined.length})
+          Attendees ({event.participants.length})
         </div>
-        {event.joined.length === 0 ? (
+        {event.participants.length === 0 ? (
           <p className="text-[13.5px] text-muted-foreground">No one has joined yet.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {event.joined.map((initials, i) => (
-              <Avatar key={i} className="h-[34px] w-[34px]">
+            {event.participants.map((p, i) => (
+              <Avatar key={p.id} className="h-[34px] w-[34px]">
                 <AvatarFallback style={{ backgroundColor: avatarColors[i % avatarColors.length] }}>
-                  {initials}
+                  {getInitials(p.name)}
                 </AvatarFallback>
               </Avatar>
             ))}
@@ -134,8 +163,8 @@ export default function AdminEventDetailPage() {
           <DialogDescription>
             This can&apos;t be undone. Everyone who joined will no longer see it on their list.
           </DialogDescription>
-          <Button variant="danger" onClick={handleDelete} className="mb-2">
-            Delete event
+          <Button variant="danger" onClick={handleDelete} className="mb-2" disabled={deleteMutation.isPending}>
+            {deleteMutation.isPending ? "Deleting..." : "Delete event"}
           </Button>
           <Button variant="ghost" onClick={() => setDeleteOpen(false)}>
             Cancel

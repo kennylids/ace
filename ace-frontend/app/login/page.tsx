@@ -3,23 +3,33 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
+import { useLoginMutation } from "@/lib/queries/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserRole } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { user } = useAuth();
+  const loginMutation = useLoginMutation();
   const [email, setEmail] = useState("maya@example.com");
-  const [password, setPassword] = useState("••••••••");
-  const [role, setRole] = useState<UserRole>("participant");
+  const [password, setPassword] = useState("password123");
+
+  if (user) {
+    router.replace(user.role === "ADMIN" ? "/admin" : "/feed");
+    return null;
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    login(email, role);
-    router.push(role === "admin" ? "/admin" : "/feed");
+    loginMutation.mutate(
+      { email, password },
+      {
+        onSuccess: (data) => {
+          router.push(data.user.role === "ADMIN" ? "/admin" : "/feed");
+        },
+      }
+    );
   }
 
   return (
@@ -56,24 +66,14 @@ export default function LoginPage() {
           />
         </div>
 
-        <div className="flex rounded-xl bg-secondary p-1">
-          {(["participant", "admin"] as UserRole[]).map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRole(r)}
-              className={cn(
-                "flex-1 rounded-lg py-2.5 text-[13.5px] font-semibold capitalize text-muted-foreground transition-colors",
-                role === r && "bg-card text-foreground shadow-sm"
-              )}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
+        {loginMutation.isError && (
+          <p className="text-[13px] text-destructive">
+            {loginMutation.error instanceof Error ? loginMutation.error.message : "Login failed"}
+          </p>
+        )}
 
-        <Button type="submit" className="mt-1">
-          Sign in
+        <Button type="submit" className="mt-1" disabled={loginMutation.isPending}>
+          {loginMutation.isPending ? "Signing in..." : "Sign in"}
         </Button>
       </form>
 

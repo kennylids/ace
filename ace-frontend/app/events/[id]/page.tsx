@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { CalendarDays, MapPin, Users, Share2, Check } from "lucide-react";
-import { useEvents } from "@/context/events-context";
+import { useEventQuery, useJoinEventMutation, useLeaveEventMutation } from "@/lib/queries/events";
+import { useAuth } from "@/context/auth-context";
+import { AuthGuard } from "@/components/auth-guard";
 import { TopBar } from "@/components/top-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,13 +16,40 @@ import { formatFullDate, formatTime } from "@/lib/format";
 
 const avatarColors = ["#2F6B3C", "#2C5F8A", "#9C3B2E", "#5C6B53", "#1C431F"];
 
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
 export default function ParticipantEventDetailPage() {
+  return (
+    <AuthGuard>
+      <EventDetailContent />
+    </AuthGuard>
+  );
+}
+
+function EventDetailContent() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const { getEvent, joinedIds, joinEvent, unjoinEvent } = useEvents();
+  const { user } = useAuth();
+  const { data: event, isLoading } = useEventQuery(params.id);
+  const joinMutation = useJoinEventMutation();
+  const leaveMutation = useLeaveEventMutation();
   const [leaveOpen, setLeaveOpen] = useState(false);
 
-  const event = getEvent(params.id);
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
   if (!event) {
     return (
       <div className="flex flex-1 flex-col">
@@ -29,15 +58,18 @@ export default function ParticipantEventDetailPage() {
     );
   }
 
-  const joined = joinedIds.has(event.id);
-  const spotsLeft = event.capacity - event.joined.length;
+  const joined = event.participants.some((p) => p.id === user?.id);
+  const spotsLeft = event.capacity - event.participants.length;
   const isFull = spotsLeft <= 0;
-  const pct = Math.min(100, Math.round((event.joined.length / event.capacity) * 100));
+  const pct = Math.min(100, Math.round((event.participants.length / event.capacity) * 100));
 
   function handleLeave() {
-    unjoinEvent(event!.id);
-    setLeaveOpen(false);
-    router.push("/my-events");
+    leaveMutation.mutate(event!.id, {
+      onSuccess: () => {
+        setLeaveOpen(false);
+        router.push("/my-events");
+      },
+    });
   }
 
   return (
@@ -100,32 +132,46 @@ export default function ParticipantEventDetailPage() {
         </div>
         <div className="mb-6 flex items-center gap-2.5">
           <div className="flex">
-            {event.joined.slice(0, 5).map((initials, i) => (
-              <Avatar key={i} className="-ml-2 first:ml-0 border-2 border-background h-[26px] w-[26px]">
+            {event.participants.slice(0, 5).map((p, i) => (
+              <Avatar key={p.id} className="-ml-2 first:ml-0 border-2 border-background h-[26px] w-[26px]">
                 <AvatarFallback
                   className="text-[9px]"
                   style={{ backgroundColor: avatarColors[i % avatarColors.length] }}
                 >
-                  {initials}
+                  {getInitials(p.name)}
                 </AvatarFallback>
               </Avatar>
             ))}
           </div>
-          <span className="text-[13px] text-muted-foreground">{event.joined.length} players joined</span>
+          <span className="text-[13px] text-muted-foreground">{event.participants.length} players joined</span>
         </div>
       </div>
 
       <div className="sticky bottom-0 bg-gradient-to-t from-background via-background to-transparent px-5 pb-6 pt-3">
         {joined ? (
-          <Button variant="outlineDanger" onClick={() => setLeaveOpen(true)}>
-            Leave event
+          <Button
+            variant="outlineDanger"
+            onClick={() => setLeaveOpen(true)}
+            disabled={leaveMutation.isPending}
+          >
+            {leaveMutation.isPending ? "Leaving..." : "Leave event"}
           </Button>
         ) : isFull ? (
           <Button disabled className="bg-secondary text-muted-foreground">
             Event is full
           </Button>
         ) : (
-          <Button onClick={() => joinEvent(event.id)}>Join event</Button>
+          <Button
+            onClick={() => joinMutation.mutate(event.id)}
+            disabled={joinMutation.isPending}
+          >
+            {joinMutation.isPending ? "Joining..." : "Join event"}
+          </Button>
+        )}
+        {joinMutation.isError && (
+          <p className="mt-2 text-center text-[13px] text-destructive">
+            {joinMutation.error instanceof Error ? joinMutation.error.message : "Failed to join"}
+          </p>
         )}
       </div>
 
@@ -135,8 +181,8 @@ export default function ParticipantEventDetailPage() {
           <p className="mb-[18px] text-[13.5px] leading-relaxed text-muted-foreground">
             Your spot will open up for someone else. You can rejoin later if there&apos;s room.
           </p>
-          <Button variant="danger" onClick={handleLeave} className="mb-2">
-            Leave event
+          <Button variant="danger" onClick={handleLeave} className="mb-2" disabled={leaveMutation.isPending}>
+            {leaveMutation.isPending ? "Leaving..." : "Leave event"}
           </Button>
           <Button variant="ghost" onClick={() => setLeaveOpen(false)}>
             Stay joined

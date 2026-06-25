@@ -3,16 +3,25 @@
 import { useRouter } from "next/navigation";
 import { LogOut, Plus, CalendarDays } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
-import { useEvents } from "@/context/events-context";
+import { useEventsQuery } from "@/lib/queries/events";
+import { AdminGuard } from "@/components/admin-guard";
 import { TopBar } from "@/components/top-bar";
 import { EventCard } from "@/components/event-card";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 
 export default function AdminDashboardPage() {
+  return (
+    <AdminGuard>
+      <AdminDashboardContent />
+    </AdminGuard>
+  );
+}
+
+function AdminDashboardContent() {
   const router = useRouter();
   const { logout } = useAuth();
-  const { events } = useEvents();
+  const { data: events, isLoading } = useEventsQuery();
 
   function handleLogout() {
     logout();
@@ -32,7 +41,11 @@ export default function AdminDashboardPage() {
       />
 
       <div className="flex-1 overflow-y-auto px-5 pb-28">
-        {events.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        ) : !events || events.length === 0 ? (
           <EmptyState
             icon={CalendarDays}
             title="No events yet"

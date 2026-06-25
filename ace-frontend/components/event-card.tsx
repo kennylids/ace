@@ -27,7 +27,7 @@ interface EventCardProps {
 }
 
 export function EventCard({ event, onClick, onMore, joined, className }: EventCardProps) {
-  const spotsLeft = event.capacity - event.joined.length;
+  const spotsLeft = event.capacity - event.participants.length;
   const isFull = spotsLeft <= 0;
 
   return (

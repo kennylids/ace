@@ -1,24 +1,56 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ListChecks } from "lucide-react";
-import { useEvents } from "@/context/events-context";
+import { ListChecks, LogOut } from "lucide-react";
+import { useEventsQuery } from "@/lib/queries/events";
+import { useAuth } from "@/context/auth-context";
+import { AuthGuard } from "@/components/auth-guard";
 import { TopBar } from "@/components/top-bar";
 import { BottomNav } from "@/components/bottom-nav";
 import { EventCard } from "@/components/event-card";
 import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
 
 export default function MyEventsPage() {
+  return (
+    <AuthGuard>
+      <MyEventsContent />
+    </AuthGuard>
+  );
+}
+
+function MyEventsContent() {
   const router = useRouter();
-  const { events, joinedIds } = useEvents();
-  const mine = events.filter((e) => joinedIds.has(e.id));
+  const { user, logout } = useAuth();
+  const { data: events, isLoading } = useEventsQuery();
+
+  function handleLogout() {
+    logout();
+    router.push("/login");
+  }
+
+  const mine = events?.filter((e) =>
+    e.participants.some((p) => p.id === user?.id)
+  ) ?? [];
 
   return (
     <div className="flex flex-1 flex-col">
-      <TopBar eyebrow="Participant" title="My events" />
+      <TopBar
+        eyebrow="Participant"
+        title="My events"
+        trailing={
+          <Button variant="icon" size="icon" onClick={handleLogout} aria-label="Log out">
+            <LogOut className="h-[18px] w-[18px]" />
+          </Button>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto px-5 pb-4">
-        {mine.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        ) : mine.length === 0 ? (
           <EmptyState
             icon={ListChecks}
             title="No events joined yet"
