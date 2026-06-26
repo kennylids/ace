@@ -10,6 +10,7 @@
     "db:seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
+    "tsx": "^4.16.2",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
@@ -30,7 +31,6 @@
     "@types/morgan": "^1.9.9",
     "@types/node": "^20.14.13",
     "@types/pg": "^8.11.6",
-    "tsx": "^4.16.2",
     "typescript": "^5.5.4"
   }
 }

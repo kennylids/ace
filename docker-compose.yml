@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ace
+      POSTGRES_PASSWORD: ace_dev_pw
+      POSTGRES_DB: ace
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ace"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./ace-backend
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://ace:ace_dev_pw@postgres:5432/ace
+      CORS_ORIGIN: http://localhost:3000
+      JWT_ACCESS_SECRET: dev-access-secret
+      JWT_REFRESH_SECRET: dev-refresh-secret
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./ace-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
